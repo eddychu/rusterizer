@@ -23,6 +23,9 @@ fn barycentric(p: Vec2, a: Vec2, b: Vec2, c: Vec2) -> Vec3 {
     let d20 = v2.dot(&v0);
     let d21 = v2.dot(&v1);
     let denom = d00 * d11 - d01 * d01;
+    if denom < f32::EPSILON {
+        println!("{:?}", denom);
+    }
     let v = (d11 * d20 - d01 * d21) / denom;
     let w = (d00 * d21 - d01 * d20) / denom;
     let u = 1.0 - v - w;
@@ -49,7 +52,7 @@ fn render(buffer: &mut FrameBuffer) {
             let c = Vec2::new(v2.x, v2.y);
             let bar = barycentric(p, a, b, c);
 
-            if bar.x >= 0.0 && bar.y >= 0.0 && bar.z >= 0.0 {
+            if bar.x > f32::EPSILON && bar.y > f32::EPSILON && bar.z > f32::EPSILON {
                 let color = c0.scale(bar.x) + c1.scale(bar.y) + c2.scale(bar.z);
                 // println!("{:?}", color);
                 buffer.write_pixel_vec3(x, y, color);

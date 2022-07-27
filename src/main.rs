@@ -2,9 +2,6 @@ extern crate minifb;
 mod framebuffer;
 mod math;
 mod rasterizer;
-use std::fs::{self, OpenOptions};
-use std::io::Write;
-use std::path::Path;
 
 use framebuffer::FrameBuffer;
 use math::{Vec2, Vec3};

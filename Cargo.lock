@@ -25,6 +25,7 @@ name = "awe"
 version = "0.1.0"
 dependencies = [
  "gltf",
+ "gltf-json",
  "image 0.24.3",
  "minifb",
 ]

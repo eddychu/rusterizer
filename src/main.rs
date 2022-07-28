@@ -1,19 +1,20 @@
 extern crate minifb;
 mod framebuffer;
+mod loader;
 mod math;
 mod model;
 mod renderstate;
 mod scene;
 mod texture;
 use framebuffer::FrameBuffer;
-use gltf::mesh::util::tex_coords;
+
 use math::{Mat4, Quat, Vec2, Vec3, Vec4};
 use minifb::{Key, Window, WindowOptions};
 use renderstate::RenderState;
 use scene::Scene;
 use texture::Texture;
-const WIDTH: usize = 800;
-const HEIGHT: usize = 600;
+const WIDTH: usize = 1920;
+const HEIGHT: usize = 1080;
 
 fn barycentric(p: Vec2, a: Vec2, b: Vec2, c: Vec2) -> Vec3 {
     let v0 = b - a;

@@ -52,4 +52,14 @@ impl FrameBuffer {
         let index = y * self.width + x;
         self.pixels[index]
     }
+
+    pub fn get_depth(&self, x: usize, y: usize) -> f32 {
+        let index = y * self.width + x;
+        self.depths[index]
+    }
+
+    pub fn set_depth(&mut self, x: usize, y: usize, value: f32) {
+        let index = y * self.width + x;
+        self.depths[index] = value;
+    }
 }

@@ -48,6 +48,17 @@ impl Sub for Vec2 {
     }
 }
 
+impl Mul<f32> for Vec2 {
+    type Output = Self;
+
+    fn mul(self, rhs: f32) -> Self {
+        Vec2 {
+            x: self.x * rhs,
+            y: self.y * rhs,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Vec3 {
     pub x: f32,
@@ -165,6 +176,10 @@ impl Vec4 {
 
     pub fn dot(&self, rhs: &Vec4) -> f32 {
         return self.x * rhs.x + self.y * rhs.y + self.z * rhs.z + self.w * rhs.w;
+    }
+
+    pub fn to_vec3(&self) -> Vec3 {
+        Vec3::new(self.x, self.y, self.z)
     }
 }
 

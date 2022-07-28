@@ -59,6 +59,7 @@ impl Vec3 {
     pub fn new(x: f32, y: f32, z: f32) -> Self {
         Vec3 { x, y, z }
     }
+
     pub fn pow(&self, n: f32) -> Self {
         return Vec3 {
             x: f32::powf(self.x, n),
@@ -142,15 +143,28 @@ impl Sub for Vec3 {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Vec4 {
-    x: f32,
-    y: f32,
-    z: f32,
-    w: f32,
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub w: f32,
 }
 
 impl Vec4 {
     pub fn new(x: f32, y: f32, z: f32, w: f32) -> Self {
         Vec4 { x, y, z, w }
+    }
+
+    pub fn from_vec3(vec3: &Vec3, w: f32) -> Self {
+        Vec4 {
+            x: vec3.x,
+            y: vec3.y,
+            z: vec3.z,
+            w,
+        }
+    }
+
+    pub fn dot(&self, rhs: &Vec4) -> f32 {
+        return self.x * rhs.x + self.y * rhs.y + self.z * rhs.z + self.w * rhs.w;
     }
 }
 
@@ -272,5 +286,31 @@ impl Mul<Vec4> for Mat4 {
             + self.column(1) * rhs.y
             + self.column(2) * rhs.z
             + self.column(3) * rhs.w;
+    }
+}
+
+impl Mul for Mat4 {
+    type Output = Mat4;
+
+    fn mul(self, rhs: Mat4) -> Self::Output {
+        let m = [
+            self.row(0).dot(&rhs.column(0)),
+            self.row(1).dot(&rhs.column(0)),
+            self.row(2).dot(&rhs.column(0)),
+            self.row(3).dot(&rhs.column(0)),
+            self.row(0).dot(&rhs.column(1)),
+            self.row(1).dot(&rhs.column(1)),
+            self.row(2).dot(&rhs.column(1)),
+            self.row(3).dot(&rhs.column(1)),
+            self.row(0).dot(&rhs.column(2)),
+            self.row(1).dot(&rhs.column(2)),
+            self.row(2).dot(&rhs.column(2)),
+            self.row(3).dot(&rhs.column(2)),
+            self.row(0).dot(&rhs.column(3)),
+            self.row(1).dot(&rhs.column(3)),
+            self.row(2).dot(&rhs.column(3)),
+            self.row(3).dot(&rhs.column(3)),
+        ];
+        Mat4 { m }
     }
 }

@@ -128,6 +128,18 @@ impl Mul for Vec3 {
     }
 }
 
+impl Mul<f32> for Vec3 {
+    type Output = Self;
+
+    fn mul(self, rhs: f32) -> Self {
+        Vec3 {
+            x: self.x * rhs,
+            y: self.y * rhs,
+            z: self.z * rhs,
+        }
+    }
+}
+
 impl Add for Vec3 {
     type Output = Self;
 
@@ -327,5 +339,106 @@ impl Mul for Mat4 {
             self.row(3).dot(&rhs.column(3)),
         ];
         Mat4 { m }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct Quat {
+    x: f32,
+    y: f32,
+    z: f32,
+    w: f32,
+}
+
+impl Quat {
+    pub fn identity() -> Self {
+        Quat {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            w: 1.0,
+        }
+    }
+
+    pub fn vector(&self) -> Vec3 {
+        Vec3::new(self.x, self.y, self.z)
+    }
+
+    pub fn length_squared(&self) -> f32 {
+        self.x * self.x + self.y * self.y + self.z * self.z + self.w * self.w
+    }
+
+    pub fn length(&self) -> f32 {
+        return self.length_squared().sqrt();
+    }
+
+    pub fn normalize(&self) -> Self {
+        return Quat {
+            x: self.x / self.length(),
+            y: self.y / self.length(),
+            z: self.z / self.length(),
+            w: self.w / self.length(),
+        };
+    }
+
+    pub fn conjugate(&self) -> Self {
+        Quat {
+            x: -self.x,
+            y: -self.y,
+            z: -self.z,
+            w: self.w,
+        }
+    }
+
+    pub fn inverse(&self) -> Self {
+        self.conjugate().normalize()
+    }
+
+    pub fn dot(&self, b: &Self) -> f32 {
+        return self.x * b.x + self.y * b.y + self.z * b.z + self.w * b.w;
+    }
+
+    pub fn to_mat4(&self) -> Mat4 {
+        let r = self.mul(Vec3::new(1.0, 0.0, 0.0));
+        let u = self.mul(Vec3::new(0.0, 1.0, 0.0));
+        let f = self.mul(Vec3::new(0.0, 0.0, 1.0));
+
+        return Mat4::new([
+            r.x, r.y, r.z, 0.0, u.x, u.y, u.z, 0.0, f.x, f.y, f.z, 0.0, 0.0, 0.0, 0.0, 1.0,
+        ]);
+    }
+
+    pub fn from_angle_axis(angle: f32, axis: Vec3) -> Self {
+        let norm = axis.normalize();
+        let s = (angle * 0.5).sin();
+        Quat {
+            x: norm.x * s,
+            y: norm.y * s,
+            z: norm.z * s,
+            w: (angle * 0.5).cos(),
+        }
+    }
+}
+
+impl Mul for Quat {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        Quat {
+            x: rhs.x * self.w + rhs.y * self.z - rhs.z * self.y + rhs.w * self.x,
+            y: -rhs.x * self.z + rhs.y * self.w + rhs.z * self.x + rhs.w * self.y,
+            z: rhs.x * self.y - rhs.y * self.x + rhs.z * self.w + rhs.w * self.z,
+            w: -rhs.x * self.x - rhs.y * self.y - rhs.z * self.z + rhs.w * self.w,
+        }
+    }
+}
+
+impl Mul<Vec3> for Quat {
+    type Output = Vec3;
+
+    fn mul(self, v: Vec3) -> Self::Output {
+        return self.vector() * 2.0 * self.vector().dot(&v)
+            + v * (self.w * self.w - self.vector().dot(&self.vector()))
+            + self.vector().cross(&v) * 2.0 * self.w;
     }
 }

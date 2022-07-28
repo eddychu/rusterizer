@@ -7,7 +7,7 @@ mod scene;
 mod texture;
 use framebuffer::FrameBuffer;
 use gltf::mesh::util::tex_coords;
-use math::{Mat4, Vec2, Vec3, Vec4};
+use math::{Mat4, Quat, Vec2, Vec3, Vec4};
 use minifb::{Key, Window, WindowOptions};
 use renderstate::RenderState;
 use scene::Scene;
@@ -117,14 +117,14 @@ fn main() {
 
     let projection = Mat4::perspective(60.0, (WIDTH as f32) / (HEIGHT as f32), 0.1, 100.0);
     let view = Mat4::lookat(
-        Vec3::new(0.0, 0.0, 5.0),
+        Vec3::new(0.0, 0.0, 3.0),
         Vec3::new(0.0, 0.0, 0.0),
         Vec3::new(0.0, 1.0, 0.0),
     );
 
     let albedo = Texture::from_file("asset/2.0/BoxTextured/glTF/CesiumLogoFlat.png");
 
-    let state = RenderState {
+    let mut state = RenderState {
         projection,
         view,
         mv: view,
@@ -144,15 +144,18 @@ fn main() {
 
     // Limit to max ~60 fps update rate
     // window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
-
+    let mut angles = 0.0f32;
     while window.is_open() && !window.is_key_down(Key::Escape) {
         // We unwrap here as we want this code to exit if it fails. Real applications may want to handle this in a different way
 
+        let rotation_quat = Quat::from_angle_axis(angles, Vec3::new(1.0, 1.0, 0.0));
+        state.mvp = projection * view * (rotation_quat).to_mat4();
         buffer.clear();
         render(&scene, &mut buffer, &state);
         // break;
         window
             .update_with_buffer(&buffer.pixels, WIDTH, HEIGHT)
             .unwrap();
+        angles += 0.02;
     }
 }

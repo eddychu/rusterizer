@@ -19,6 +19,14 @@ impl Texture {
     //     }
     // }
 
+    pub fn new() -> Self {
+        Texture {
+            data: Vec::new(),
+            width: 0,
+            height: 0,
+        }
+    }
+
     pub fn from_file(file_path: &str) -> Self {
         let img = image::open(file_path).expect("File not found!");
         let width = img.width() as usize;

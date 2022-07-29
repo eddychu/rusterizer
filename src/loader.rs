@@ -1,59 +1,49 @@
-use std::os::windows::process;
+use std::primitive;
 
-use crate::{math::Vec2, math::Vec3, texture::Texture};
+use crate::{math::Vec2, math::Vec3, scene::Material, texture::Texture};
 use gltf::{
     self,
-    buffer::Data,
+    buffer::{Data, View},
     image::Source,
     texture::{MagFilter, MinFilter, Sampler, WrappingMode},
     Document, Gltf,
 };
-struct IMesh {
-    position: Vec<Vec3>,
-    indices: Vec<usize>,
-    material: Option<usize>,
+
+#[derive(Debug, Clone)]
+pub struct IMesh {
+    pub primitives: Vec<IMeshPrimitive>,
 }
 
-struct ITexture {
+#[derive(Debug, Clone)]
+pub struct IMeshPrimitive {
+    pub positions: Vec<Vec3>,
+    pub indices: Vec<usize>,
+    pub tex_coords: Vec<Vec2>,
+    pub material: Option<usize>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ITexture {
     sampler: usize,
     image: usize,
 }
 
-struct IMaterial {
+#[derive(Debug, Clone)]
+pub struct IMaterial {
     base_color_texture: usize,
 }
-
-struct ISceneNode {
-    parent: Option<usize>,
-    children: Vec<usize>,
-    meshes: Vec<usize>,
+#[derive(Debug, Clone)]
+pub struct ISceneNode {
+    pub parent: Option<usize>,
+    pub children: Vec<usize>,
+    pub mesh: Option<usize>,
 }
-
-// pub enum MagFilter {
-//     Nearest,
-//     Linear,
-// }
-
-// pub enum MinFilter {
-//     Nearest,
-//     Linear,
-//     NearestMipmapNearest,
-//     LinearMipmapNearest,
-//     NearestMipmapLinear,
-//     LinearMipmapLinear,
-// }
-
-// pub enum WrappingMode {
-//     ClampToEdge,
-//     MirroredRepeat,
-//     Repeat,
-// }
-
-struct TextureSampler {
+#[derive(Debug, Clone)]
+pub struct TextureSampler {
     wrap_s: WrappingMode,
     wrap_t: WrappingMode,
-    min_filter: Option<MinFilter>,
-    mag_filter: Option<MagFilter>,
+    min_filter: MinFilter,
+    mag_filter: MagFilter,
 }
 
 impl ISceneNode {
@@ -61,45 +51,116 @@ impl ISceneNode {
         ISceneNode {
             parent: None,
             children: Vec::new(),
-            meshes: Vec::new(),
+            mesh: None,
         }
     }
 }
-
-struct IScene {
-    nodes: Vec<ISceneNode>,
-    meshes: Vec<IMesh>,
-    textures: Vec<ITexture>,
-    materials: Vec<IMaterial>,
-    samplers: Vec<TextureSampler>,
+#[derive(Debug, Clone)]
+pub struct IScene {
+    pub nodes: Vec<usize>,
+}
+#[derive(Debug, Clone)]
+pub struct IGltf {
+    pub scene: Option<usize>,
+    pub scenes: Vec<IScene>,
+    pub nodes: Vec<ISceneNode>,
+    pub materials: Vec<IMaterial>,
+    pub meshes: Vec<IMesh>,
+    pub textures: Vec<ITexture>,
+    pub samplers: Vec<TextureSampler>,
+    pub images: Vec<Texture>,
 }
 
-impl IScene {
+impl IGltf {
     pub fn new() -> Self {
-        IScene {
+        IGltf {
+            scene: None,
+            scenes: Vec::new(),
             nodes: Vec::new(),
+            materials: Vec::new(),
             meshes: Vec::new(),
             textures: Vec::new(),
-            materials: Vec::new(),
             samplers: Vec::new(),
+            images: Vec::new(),
         }
     }
 
-    pub fn load(path: &str) {
-        let mut scene = IScene::new();
+    pub fn load(path: &str) -> Self {
+        let mut igltf = IGltf::new();
         let (document, buffers, _) = gltf::import(path).expect("failed to load file");
-        IScene::process_meshes(&document, &buffers, &mut scene);
-        IScene::process_materials(&document, &mut scene);
-        IScene::process_textures(&document, &mut scene);
+        let mut comps: Vec<&str> = path.split("/").collect();
+        comps.pop();
+        let dir = comps.join("/");
+
+        if let Some(default_scene) = document.default_scene() {
+            igltf.scene = Some(default_scene.index());
+        }
+
+        IGltf::process_meshes(&document, &buffers, &mut igltf);
+        IGltf::process_materials(&document, &mut igltf);
+        IGltf::process_textures(&document, &mut igltf);
+        IGltf::process_samplers(&document, &mut igltf);
+        IGltf::process_images(&document, &mut igltf, &dir.as_str());
+        IGltf::process_nodes(&document, &mut igltf);
+        IGltf::process_scenes(&document, &mut igltf);
+        igltf
     }
 
-    pub fn process_meshes(document: &Document, buffers: &Vec<Data>, scene: &mut IScene) {
+    pub fn process_scenes(document: &Document, igltf: &mut IGltf) {
+        let scenes = document.scenes();
+        for scene in scenes {
+            let mut iscene = IScene { nodes: Vec::new() };
+            for node in scene.nodes() {
+                iscene.nodes.push(node.index());
+            }
+            igltf.scenes.push(iscene);
+        }
+    }
+
+    pub fn process_nodes(document: &Document, igltf: &mut IGltf) {
+        let nodes = document.nodes();
+        let size = nodes.len();
+        igltf.nodes.resize(
+            size,
+            ISceneNode {
+                parent: None,
+                children: Vec::new(),
+                mesh: None,
+            },
+        );
+        for node in nodes {
+            IGltf::process_node(&node, None, igltf);
+        }
+    }
+
+    pub fn process_node(node: &gltf::Node, parent: Option<usize>, igltf: &mut IGltf) {
+        let index = node.index();
+        for child in node.children() {
+            igltf.nodes[index].children.push(child.index());
+        }
+        if let Some(mesh) = node.mesh() {
+            igltf.nodes[index].mesh = Some(mesh.index());
+        }
+
+        // TODO: handle camera / transform etc.
+    }
+
+    pub fn process_meshes(document: &Document, buffers: &Vec<Data>, igltf: &mut IGltf) {
         let meshes = document.meshes();
+        let size = meshes.len();
+        igltf.meshes.resize(
+            size,
+            IMesh {
+                primitives: Vec::new(),
+            },
+        );
         for mesh in meshes {
-            let mut positions: Vec<Vec3> = Vec::new();
-            let mut indicies: Vec<usize> = Vec::new();
-            let mut tc: Vec<Vec2> = Vec::new();
+            let index = mesh.index();
             for primitive in mesh.primitives() {
+                let mut positions: Vec<Vec3> = Vec::new();
+                let mut indices: Vec<usize> = Vec::new();
+                let mut tex_coords: Vec<Vec2> = Vec::new();
+                let material = primitive.material().index();
                 let reader = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
                 if let Some(iter) = reader.read_positions() {
                     for vertex_position in iter {
@@ -113,28 +174,28 @@ impl IScene {
                 if let Some(iter) = reader.read_indices() {
                     let iter = iter.into_u32();
                     for indice in iter {
-                        indicies.push(indice as usize);
+                        indices.push(indice as usize);
                     }
                 }
                 if let Some(iter) = reader.read_tex_coords(0) {
                     for tex_coord in iter.into_f32() {
-                        tc.push(Vec2::new(tex_coord[0], tex_coord[1]))
+                        tex_coords.push(Vec2::new(tex_coord[0], tex_coord[1]))
                     }
                 }
+                igltf.meshes[index].primitives.push(IMeshPrimitive {
+                    positions,
+                    indices,
+                    tex_coords,
+                    material,
+                })
             }
-            let imesh = IMesh {
-                position: positions,
-                indices: indicies,
-                material: None,
-            };
-            scene.meshes.push(imesh);
         }
     }
 
-    pub fn process_materials(document: &Document, scene: &mut IScene) {
+    pub fn process_materials(document: &Document, igltf: &mut IGltf) {
         let materials = document.materials();
         for material in materials {
-            let base_color_factor = material.pbr_metallic_roughness().base_color_factor();
+            // let base_color_factor = material.pbr_metallic_roughness().base_color_factor();
             let base_color_texture = material
                 .pbr_metallic_roughness()
                 .base_color_texture()
@@ -142,37 +203,58 @@ impl IScene {
                 .texture()
                 .index();
             let imaterial = IMaterial { base_color_texture };
-            scene.materials.push(imaterial);
+            igltf.materials.push(imaterial);
         }
     }
 
-    pub fn process_textures(document: &Document, scene: &mut IScene) {
+    pub fn process_textures(document: &Document, igltf: &mut IGltf) {
         let textures = document.textures();
         let size = textures.len();
-        scene.textures = Vec::with_capacity(size);
+        igltf.textures.resize(
+            size,
+            ITexture {
+                sampler: 0,
+                image: 0,
+            },
+        );
         for texture in textures {
             let index = texture.index();
             let sampler_index = texture.sampler().index().or(Some(0)).unwrap();
             let image_index = texture.source().index();
-            scene.textures[index] = ITexture {
+            igltf.textures[index] = ITexture {
                 sampler: sampler_index,
                 image: image_index,
             }
         }
     }
 
-    pub fn process_samplers(document: &Document, scene: &mut IScene) {
+    pub fn process_samplers(document: &Document, igltf: &mut IGltf) {
         let samplers = document.samplers();
         let size = samplers.len();
-        scene.samplers = Vec::with_capacity(size);
+        igltf.samplers.resize(
+            size,
+            TextureSampler {
+                wrap_s: WrappingMode::Repeat,
+                wrap_t: WrappingMode::Repeat,
+                min_filter: MinFilter::Linear,
+                mag_filter: MagFilter::Linear,
+            },
+        );
         for sampler in samplers {
             let index = sampler.index().or(Some(0)).expect("need sampler index");
-            let min_filter = sampler.min_filter();
-            let mag_filter = sampler.mag_filter();
+
+            let mut min_filter: MinFilter = MinFilter::Linear;
+            let mut mag_filter: MagFilter = MagFilter::Nearest;
+            if let Some(filter) = sampler.min_filter() {
+                min_filter = filter;
+            }
+            if let Some(filter) = sampler.mag_filter() {
+                mag_filter = filter;
+            }
             let wrap_s = sampler.wrap_s();
             let wrap_t = sampler.wrap_t();
 
-            scene.samplers[index] = TextureSampler {
+            igltf.samplers[index] = TextureSampler {
                 min_filter,
                 mag_filter,
                 wrap_s,
@@ -181,72 +263,21 @@ impl IScene {
         }
     }
 
-    pub fn process_images(document: &Document, scene: &mut IScene) {
+    pub fn process_images(document: &Document, igltf: &mut IGltf, dir: &str) {
         let images = document.images();
-    }
-
-    pub fn process_node(
-        gltf_node: &gltf::Node,
-        gltf_buffers: &Vec<Data>,
-        parent: Option<usize>,
-        scene: &mut Self,
-        dir: &str,
-    ) -> usize {
-        let mut node = ISceneNode::new();
-        node.parent = parent;
-        scene.nodes.push(node);
-        let current_index = scene.nodes.len() - 1;
-        if let Some(mesh) = gltf_node.mesh() {
-            let mut positions: Vec<Vec3> = Vec::new();
-            let mut indicies: Vec<u32> = Vec::new();
-            let mut tc: Vec<Vec2> = Vec::new();
-            for primitive in mesh.primitives() {
-                let reader = primitive.reader(|buffer| Some(&gltf_buffers[buffer.index()]));
-
-                if let Some(iter) = reader.read_positions() {
-                    for vertex_position in iter {
-                        positions.push(Vec3::new(
-                            vertex_position[0],
-                            vertex_position[1],
-                            vertex_position[2],
-                        ))
-                    }
+        let size = images.len();
+        igltf.images.resize(size, Texture::new());
+        for image in images {
+            match image.source() {
+                Source::Uri { uri, mime_type } => {
+                    let image_path = [dir, uri].join("/");
+                    let tex = Texture::from_file(&image_path);
+                    igltf.images[image.index()] = tex;
                 }
-                if let Some(iter) = reader.read_indices() {
-                    let iter = iter.into_u32();
-                    for indice in iter {
-                        indicies.push(indice);
-                    }
-                }
-                if let Some(iter) = reader.read_tex_coords(0) {
-                    for tex_coord in iter.into_f32() {
-                        tc.push(Vec2::new(tex_coord[0], tex_coord[1]))
-                    }
-                }
-                // let mut material: Option<Material> = None;
-                // if let Some(base_color) = primitive
-                //     .material()
-                //     .pbr_metallic_roughness()
-                //     .base_color_texture()
-                // {
-                //     let image = base_color.texture().source().index();
-                // }
-                if positions.len() > 0 {
-                    scene.nodes[current_index].meshes.push(Mesh {
-                        vertices: positions.clone(),
-                        indicies: indicies.clone(),
-                        tex_coords: tc.clone(),
-                        material: None,
-                    })
+                Source::View { view, mime_type } => {
+                    todo!("TODO: handle source view")
                 }
             }
         }
-
-        for child in gltf_node.children() {
-            let child_index =
-                Scene::process_node(&child, &gltf_buffers, Some(current_index), scene, dir);
-            scene.nodes[current_index].children.push(child_index);
-        }
-        current_index
     }
 }

@@ -9,6 +9,7 @@ edition = "2021"
 image = "0.24.3"
 minifb = "0.23.0"
 gltf-json = "1.0.0"
+nalgebra = "0.31.0"
 
 [dependencies.gltf]
 version = "1.0"

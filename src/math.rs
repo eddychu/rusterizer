@@ -239,17 +239,36 @@ pub struct Mat4 {
 
 impl Mat4 {
     pub fn frustum(l: f32, r: f32, b: f32, t: f32, n: f32, f: f32) -> Self {
+        // return Mat4::new([
+        //     (2.0 * n) / (r - l),
+        //     0.0,
+        //     0.0,
+        //     0.0,
+        //     0.0,
+        //     (2.0 * n) / (t - b),
+        //     0.0,
+        //     0.0,
+        //     (r + l) / (r - l),
+        //     (t + b) / (t - b),
+        //     (-(f + n)) / (f - n),
+        //     -1.0,
+        //     0.0,
+        //     0.0,
+        //     (-2.0 * f * n) / (f - n),
+        //     0.0,
+        // ]);
+
         return Mat4::new([
             (2.0 * n) / (r - l),
             0.0,
-            0.0,
+            (r + l) / (r - l),
             0.0,
             0.0,
             (2.0 * n) / (t - b),
-            0.0,
-            0.0,
-            (r + l) / (r - l),
             (t + b) / (t - b),
+            0.0,
+            0.0,
+            0.0,
             (-(f + n)) / (f - n),
             -1.0,
             0.0,
@@ -309,10 +328,14 @@ impl Mul<Vec4> for Mat4 {
     type Output = Vec4;
 
     fn mul(self, rhs: Vec4) -> Self::Output {
-        return self.column(0) * rhs.x
-            + self.column(1) * rhs.y
-            + self.column(2) * rhs.z
-            + self.column(3) * rhs.w;
+        return Vec4::new(
+            self.column(0).dot(&rhs),
+            self.column(1).dot(&rhs),
+            self.column(2).dot(&rhs),
+            self.column(3).dot(&rhs),
+        );
+
+        // self.column(0) + self.column(1) * rhs.y + self.column(2) * rhs.z + self.column(3) * rhs.w;
     }
 }
 
@@ -322,20 +345,20 @@ impl Mul for Mat4 {
     fn mul(self, rhs: Mat4) -> Self::Output {
         let m = [
             self.row(0).dot(&rhs.column(0)),
-            self.row(1).dot(&rhs.column(0)),
-            self.row(2).dot(&rhs.column(0)),
-            self.row(3).dot(&rhs.column(0)),
             self.row(0).dot(&rhs.column(1)),
-            self.row(1).dot(&rhs.column(1)),
-            self.row(2).dot(&rhs.column(1)),
-            self.row(3).dot(&rhs.column(1)),
             self.row(0).dot(&rhs.column(2)),
-            self.row(1).dot(&rhs.column(2)),
-            self.row(2).dot(&rhs.column(2)),
-            self.row(3).dot(&rhs.column(2)),
             self.row(0).dot(&rhs.column(3)),
+            self.row(1).dot(&rhs.column(0)),
+            self.row(1).dot(&rhs.column(1)),
+            self.row(1).dot(&rhs.column(2)),
             self.row(1).dot(&rhs.column(3)),
+            self.row(2).dot(&rhs.column(0)),
+            self.row(2).dot(&rhs.column(1)),
+            self.row(2).dot(&rhs.column(2)),
             self.row(2).dot(&rhs.column(3)),
+            self.row(3).dot(&rhs.column(0)),
+            self.row(3).dot(&rhs.column(1)),
+            self.row(3).dot(&rhs.column(2)),
             self.row(3).dot(&rhs.column(3)),
         ];
         Mat4 { m }
@@ -440,5 +463,69 @@ impl Mul<Vec3> for Quat {
         return self.vector() * 2.0 * self.vector().dot(&v)
             + v * (self.w * self.w - self.vector().dot(&self.vector()))
             + self.vector().cross(&v) * 2.0 * self.w;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::f32::consts::PI;
+
+    use super::Mat4;
+    use super::Vec3;
+    use super::Vec4;
+
+    #[test]
+    fn test_perspective_mat4() {
+        let fov = 60.0 * PI / 180.0;
+        let aspect = 4.0 / 3.0;
+        let znear = 1.0;
+        let zfar = 100.0;
+        let perspective1 = Mat4::perspective(60.0, 4.0 / 3.0, 1.0, 100.0);
+        let perspective2 = nalgebra::base::Matrix4::new_perspective(aspect, fov, znear, zfar);
+        println!("{:?}", perspective1);
+        println!("{:?}", perspective2);
+    }
+    #[test]
+    fn test_lookat_mat4() {
+        let lookat1 = Mat4::lookat(
+            Vec3::new(-1.0, -1.0, 5.0),
+            Vec3::new(1.0, 1.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+        );
+
+        let lookat2 = nalgebra::base::Matrix4::look_at_rh(
+            &nalgebra::Point3::new(-1.0, -1.0, 5.0),
+            &nalgebra::Point3::new(1.0, 1.0, 0.0),
+            &nalgebra::Vector3::new(0.0, 1.0, 0.0),
+        );
+        println!("{:?}", lookat1);
+        println!("{:?}", lookat2);
+    }
+
+    #[test]
+    fn test_matrix_mul() {
+        let mat1 = Mat4::new([
+            0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0,
+        ]);
+        let mat2 = nalgebra::base::Matrix4::new(
+            0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0,
+        );
+
+        println!("{:?}", mat1 * mat1);
+        println!("{:?}", mat2 * mat2);
+    }
+    #[test]
+    fn test_matrix_vec_mul() {
+        let mat1 = Mat4::new([
+            0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0,
+        ]);
+        let vec1 = Vec4::new(0.4, 0.3, 0.5, 1.0);
+        let vec2 = nalgebra::Vector4::new(0.4, 0.3, 0.5, 1.0);
+        let mat2 = nalgebra::Matrix4::new(
+            0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0,
+        );
+
+        println!("{:?}", mat1 * vec1);
+        println!("{:?}", mat2 * vec2);
     }
 }

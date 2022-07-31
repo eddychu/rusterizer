@@ -21,6 +21,10 @@ fn is_top_left(v0: &Vec2, v1: &Vec2) -> bool {
     return v1.y <= v0.y;
 }
 
+fn orient2d(a: &Vec2, b: &Vec2, c: &Vec2) -> f32 {
+    return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+}
+
 fn barycentric(p: Vec2, a: Vec2, b: Vec2, c: Vec2) -> Vec3 {
     let v0 = b - a;
     let v1 = c - a;
@@ -39,6 +43,7 @@ fn barycentric(p: Vec2, a: Vec2, b: Vec2, c: Vec2) -> Vec3 {
 
 fn render(model: &Model, buffer: &mut FrameBuffer, state: &RenderState) {
     let mesh = &model.mesh;
+    println!("{:?}", mesh.num_of_indices());
     for i in (0..mesh.num_of_indices() - 2).step_by(3) {
         let i0 = mesh.indice(i);
         let i1 = mesh.indice(i + 1);
@@ -47,6 +52,8 @@ fn render(model: &Model, buffer: &mut FrameBuffer, state: &RenderState) {
         let v0 = mesh.position(i0);
         let v1 = mesh.position(i1);
         let v2 = mesh.position(i2);
+
+        println!("{:?} {:?} {:?} ", v0, v1, v2);
 
         // let t0 = vertex0.tc.unwrap();
         // let t1 = vertex1.tc.unwrap();
@@ -89,27 +96,21 @@ fn render(model: &Model, buffer: &mut FrameBuffer, state: &RenderState) {
         let b = Vec2::new(clip_v1.x + 0.5, clip_v1.y + 0.5);
         let c = Vec2::new(clip_v2.x + 0.5, clip_v2.y + 0.5);
 
-        // let cull = a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y);
-        // if cull <= 0.0 {
-        //     return;
-        // }
+        let a01 = a.y - b.y;
+        let b01 = b.x - a.x;
+        let a12 = b.y - c.y;
+        let b12 = c.x - b.x;
+        let a20 = c.y - a.y;
+        let b20 = a.x - c.x;
 
         for x in min_x..max_x + 1 {
             for y in min_y..max_y + 1 {
                 let p = Vec2::new(x as f32 + 0.5, y as f32 + 0.5);
-                // let e0 = b0 * (p.x - a.x) + c0 * (p.y - a.y);
-                // let e1 = b1 * (p.x - b.x) * c1 * (p.y - b.y);
+                let w0 = orient2d(&b, &c, &p);
+                let w1 = orient2d(&c, &a, &p);
+                let w2 = orient2d(&a, &b, &p);
                 let bary = barycentric(p, a, b, c);
-                if bary.x > 0.0 && bary.y >= 0.0 && bary.z >= 0.0 {
-                    // println!("{} {}", x, y);
-                    // println!(
-                    //     "{:?} {:?} {:?}",
-                    //     edge_test(b, c, p),
-                    //     edge_test(c, a, p),
-                    //     edge_test(a, b, p)
-                    // );
-
-                    // println!("{:?} {:?} {:?}", clip_v0, clip_v1, clip_v2);
+                if w0 >= 0.0 && w1 >= 0.0 && w2 >= 0.0 {
                     let z = bary.x * clip_v0.z + bary.y * clip_v1.z + bary.z * clip_v2.z;
                     // let t = t0 * bary.x + t1 * bary.y + t2 * bary.z;
                     if z < buffer.get_depth(x, y) {
@@ -120,6 +121,20 @@ fn render(model: &Model, buffer: &mut FrameBuffer, state: &RenderState) {
                         buffer.write_pixel_vec3(x, y, Vec3::new(1.0, 0.0, 0.0));
                     }
                 }
+                // let e0 = b0 * (p.x - a.x) + c0 * (p.y - a.y);
+                // let e1 = b1 * (p.x - b.x) * c1 * (p.y - b.y);
+                // let bary = barycentric(p, a, b, c);
+                // if bary.x > 0.0 && bary.y >= 0.0 && bary.z >= 0.0 {
+                //     let z = bary.x * clip_v0.z + bary.y * clip_v1.z + bary.z * clip_v2.z;
+                //     // let t = t0 * bary.x + t1 * bary.y + t2 * bary.z;
+                //     if z < buffer.get_depth(x, y) {
+                //         buffer.set_depth(x, y, z);
+                //         // let color = state.albedo.sample_repeat(&t);
+
+                //         // println!("{:?}", color);
+                //         buffer.write_pixel_vec3(x, y, Vec3::new(1.0, 0.0, 0.0));
+                //     }
+                // }
             }
         }
     }
@@ -129,6 +144,7 @@ fn main() {
     let mut buffer = FrameBuffer::new(WIDTH, HEIGHT);
 
     let projection = Mat4::perspective(60.0, (WIDTH as f32) / (HEIGHT as f32), 0.1, 100.0);
+
     let view = Mat4::lookat(
         Vec3::new(0.0, 0.0, 10.0),
         Vec3::new(0.0, 0.0, 0.0),
@@ -143,7 +159,7 @@ fn main() {
     );
 
     let model = Model {
-        mesh: Box::new(triangle),
+        mesh: Box::new(cube),
     };
 
     let albedo = Texture::from_file("asset/2.0/BoxTextured/glTF/CesiumLogoFlat.png");
@@ -172,8 +188,8 @@ fn main() {
     while window.is_open() && !window.is_key_down(Key::Escape) {
         // We unwrap here as we want this code to exit if it fails. Real applications may want to handle this in a different way
 
-        // let rotation_quat = Quat::from_angle_axis(angles, Vec3::new(1.0, 1.0, 0.0));
-        // state.mvp = projection * view * (rotation_quat).to_mat4();
+        let rotation_quat = Quat::from_angle_axis(angles, Vec3::new(1.0, 1.0, 1.0));
+        state.mvp = projection * view * (rotation_quat.to_mat4());
         buffer.clear();
         render(&model, &mut buffer, &state);
         // break;

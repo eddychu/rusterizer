@@ -86,9 +86,26 @@ fn render_gltf_node(
                 let mut clip_v2 = state.mvp * Vec4::from_vec3(&v2, 1.0);
 
                 // perspective devide
-                clip_v0 = clip_v0 * (1.0 / clip_v0.w);
-                clip_v1 = clip_v1 * (1.0 / clip_v1.w);
-                clip_v2 = clip_v2 * (1.0 / clip_v2.w);
+                clip_v0 = Vec4::new(
+                    clip_v0.x / clip_v0.w,
+                    clip_v0.y / clip_v0.w,
+                    clip_v0.z / clip_v0.w,
+                    clip_v0.w,
+                );
+                clip_v1 = Vec4::new(
+                    clip_v1.x / clip_v1.w,
+                    clip_v1.y / clip_v1.w,
+                    clip_v1.z / clip_v1.w,
+                    clip_v1.w,
+                );
+                clip_v2 = Vec4::new(
+                    clip_v2.x / clip_v2.w,
+                    clip_v2.y / clip_v2.w,
+                    clip_v2.z / clip_v2.w,
+                    clip_v2.w,
+                );
+
+                // println!("{:?} {:?} {:?}", clip_v0, clip_v1, clip_v2);
 
                 // view_port_transform
                 clip_v0.x = (clip_v0.x + 1.0) * 0.5 * WIDTH as f32;
@@ -123,33 +140,33 @@ fn render_gltf_node(
                     continue;
                 }
 
-                // face culling
-
-                if a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y) <= 0.0 {
-                    continue;
-                }
-
                 for x in min_x..max_x + 1 {
                     for y in min_y..max_y + 1 {
                         let p = Vec2::new(x as f32 + 0.5, y as f32 + 0.5);
+                        let mut w0 = orient2d(b, c, p);
+                        let mut w1 = orient2d(c, a, p);
+                        let mut w2 = orient2d(a, b, p);
 
-                        let w0 = orient2d(b, c, p) / area;
-                        let w1 = orient2d(c, a, p) / area;
-                        let w2 = orient2d(a, b, p) / area;
-                        // println!("{} {} {}", w0, w1, w2);
-                        let bary = barycentric(p, a, b, c);
+                        // let bary = barycentric(p, a, b, c);
+
                         if w0 >= 0.0 && w1 >= 0.0 && w2 >= 0.0 {
-                            let mut bc_clip = Vec3::new(
-                                bary.x / clip_v0.w,
-                                bary.y / clip_v1.w,
-                                bary.z / clip_v2.w,
-                            );
-                            bc_clip = bc_clip * (1.0 / (bc_clip.x + bc_clip.y + bc_clip.z));
-                            let z = bc_clip.x * clip_v0.z
-                                + bc_clip.y * clip_v1.z
-                                + bc_clip.z * clip_v2.z;
-                            let t = t0 * bc_clip.x + t1 * bc_clip.y + t2 * bc_clip.z;
+                            w0 /= area;
+                            w1 /= area;
+                            w2 /= area;
+
+                            let z = w0 * clip_v0.z + w1 * clip_v1.z + w2 * clip_v2.z;
+
                             if z < buffer.get_depth(x, y) {
+                                let w0_perp = w0 / clip_v0.w;
+                                let w1_perp = w1 / clip_v1.w;
+                                let w2_perp = w2 / clip_v2.w;
+                                let l = w0_perp + w1_perp + w2_perp;
+                                let w0_perp = w0_perp / l;
+                                let w1_perp = w1_perp / l;
+                                let w2_perp = w2_perp / l;
+
+                                let t = t0 * w0_perp + t1 * w1_perp + t2 * w2_perp;
+
                                 buffer.set_depth(x, y, z);
                                 let color = state.albedo.sample_repeat(&t);
 
@@ -251,21 +268,10 @@ fn render(mesh: &Cube, buffer: &mut FrameBuffer, state: &RenderState) {
         let b = Vec2::new(clip_v1.x + 0.5, clip_v1.y + 0.5);
         let c = Vec2::new(clip_v2.x + 0.5, clip_v2.y + 0.5);
 
-        let a01 = a.y - b.y;
-        let b01 = b.x - a.x;
-        let a12 = b.y - c.y;
-        let b12 = c.x - b.x;
-        let a20 = c.y - a.y;
-        let b20 = a.x - c.x;
-
         let area = orient2d(a, b, c);
         if area <= 0.0 {
             continue;
         }
-
-        // if a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y) <= 0.0 {
-        //     continue;
-        // }
 
         for x in min_x..max_x + 1 {
             for y in min_y..max_y + 1 {
@@ -273,8 +279,7 @@ fn render(mesh: &Cube, buffer: &mut FrameBuffer, state: &RenderState) {
                 let mut w0 = orient2d(b, c, p);
                 let mut w1 = orient2d(c, a, p);
                 let mut w2 = orient2d(a, b, p);
-                let bc_screen = barycentric(p, a, b, c);
-                // println!("{} {} {}", w0, w1, w2);
+
                 // let bary = barycentric(p, a, b, c);
 
                 if w0 >= 0.0 && w1 >= 0.0 && w2 >= 0.0 {
@@ -282,22 +287,19 @@ fn render(mesh: &Cube, buffer: &mut FrameBuffer, state: &RenderState) {
                     w1 /= area;
                     w2 /= area;
 
-                    let mut bc_clip = Vec3::new(
-                        bc_screen.x / clip_v0.w,
-                        bc_screen.y / clip_v1.w,
-                        bc_screen.z / clip_v2.w,
-                    );
+                    let z = w0 * clip_v0.z + w1 * clip_v1.z + w2 * clip_v2.z;
 
-                    bc_clip = bc_clip * (1.0 / (bc_clip.x + bc_clip.y + bc_clip.z));
-
-                    //let z = w0 * clip_v0.z + w1 * clip_v1.z + w2 * clip_v2.z;
-                    let z = bc_clip.x * clip_v0.z + bc_clip.y * clip_v1.z + bc_clip.z * clip_v2.z;
-
-                    let t = t0 * bc_clip.x + t1 * bc_clip.y + t2 * bc_clip.z;
-                    // let t = t * z;
-
-                    // println!("{}", z);
                     if z < buffer.get_depth(x, y) {
+                        let w0_perp = w0 / clip_v0.w;
+                        let w1_perp = w1 / clip_v1.w;
+                        let w2_perp = w2 / clip_v2.w;
+                        let l = w0_perp + w1_perp + w2_perp;
+                        let w0_perp = w0_perp / l;
+                        let w1_perp = w1_perp / l;
+                        let w2_perp = w2_perp / l;
+
+                        let t = t0 * w0_perp + t1 * w1_perp + t2 * w2_perp;
+
                         buffer.set_depth(x, y, z);
                         let color = state.albedo.sample_repeat(&t);
 
@@ -369,7 +371,8 @@ fn main() {
         state.mvp = projection * view * (rotation_quat.to_mat4());
         buffer.clear();
 
-        render(&cube, &mut buffer, &state);
+        //render(&cube, &mut buffer, &state);
+        render_gltf(&gltf, &mut buffer, &state);
         // return;
         window
             .update_with_buffer(&buffer.pixels, WIDTH, HEIGHT)

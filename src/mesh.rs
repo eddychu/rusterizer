@@ -1,46 +1,8 @@
 use crate::math::{Vec2, Vec3};
 
-pub trait Mesh {
-    fn position(&self, i: usize) -> Vec3;
-    fn indice(&self, i: usize) -> usize;
-    fn num_of_indices(&self) -> usize;
-    fn num_of_vertices(&self) -> usize;
-}
-
-pub struct Triangle {
-    pub positions: Vec<Vec3>,
-    pub indices: Vec<usize>,
-}
-
-impl Triangle {
-    pub fn new(v0: Vec3, v1: Vec3, v2: Vec3) -> Self {
-        Triangle {
-            positions: vec![v0, v1, v2],
-            indices: vec![0, 1, 2],
-        }
-    }
-}
-
-impl Mesh for Triangle {
-    fn indice(&self, i: usize) -> usize {
-        return self.indices[i];
-    }
-
-    fn position(&self, i: usize) -> Vec3 {
-        return self.positions[i];
-    }
-
-    fn num_of_indices(&self) -> usize {
-        self.indices.len()
-    }
-
-    fn num_of_vertices(&self) -> usize {
-        self.positions.len()
-    }
-}
-
 pub struct Cube {
     pub positions: Vec<Vec3>,
+    pub vertex_coords: Vec<Vec2>,
     pub indices: Vec<usize>,
 }
 
@@ -149,24 +111,23 @@ impl Cube {
         Cube {
             positions: p,
             indices: i,
+            vertex_coords: tc,
         }
     }
-}
 
-impl Mesh for Cube {
-    fn indice(&self, i: usize) -> usize {
+    pub fn indice(&self, i: usize) -> usize {
         return self.indices[i];
     }
 
-    fn position(&self, i: usize) -> Vec3 {
+    pub fn position(&self, i: usize) -> Vec3 {
         return self.positions[i];
     }
 
-    fn num_of_indices(&self) -> usize {
+    pub fn num_of_indices(&self) -> usize {
         self.indices.len()
     }
 
-    fn num_of_vertices(&self) -> usize {
+    pub fn num_of_vertices(&self) -> usize {
         self.positions.len()
     }
 }

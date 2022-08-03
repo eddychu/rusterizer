@@ -4,7 +4,7 @@ A software renderer implemented in rust. (work in progress)
 
 ## Todos
 
-- [x] Basic Graphcis Piepline 
+- [x] Basic Graphics Pipeline 
 
 - [ ] scene graph
 

@@ -3,6 +3,8 @@ use std::{
     ops::{Add, Mul, Sub},
 };
 
+use nalgebra::Scalar;
+
 #[derive(Debug, Clone, Copy)]
 pub struct Vec2 {
     pub x: f32,
@@ -234,30 +236,11 @@ impl Mul<f32> for Vec4 {
  */
 #[derive(Debug, Clone, Copy)]
 pub struct Mat4 {
-    m: [f32; 16],
+    pub m: [f32; 16],
 }
 
 impl Mat4 {
     pub fn frustum(l: f32, r: f32, b: f32, t: f32, n: f32, f: f32) -> Self {
-        // return Mat4::new([
-        //     (2.0 * n) / (r - l),
-        //     0.0,
-        //     0.0,
-        //     0.0,
-        //     0.0,
-        //     (2.0 * n) / (t - b),
-        //     0.0,
-        //     0.0,
-        //     (r + l) / (r - l),
-        //     (t + b) / (t - b),
-        //     (-(f + n)) / (f - n),
-        //     -1.0,
-        //     0.0,
-        //     0.0,
-        //     (-2.0 * f * n) / (f - n),
-        //     0.0,
-        // ]);
-
         return Mat4::new([
             (2.0 * n) / (r - l),
             0.0,
@@ -301,6 +284,23 @@ impl Mat4 {
         Mat4 { m }
     }
 
+    pub fn translate(x: f32, y: f32, z: f32) -> Self {
+        let mut m = Mat4::identity();
+        m.m[12] = x;
+        m.m[13] = y;
+        m.m[14] = z;
+        m
+    }
+
+    pub fn scale(x: f32, y: f32, z: f32) -> Self {
+        let mut m = [0.0f32; 16];
+        m[0] = x;
+        m[5] = y;
+        m[10] = z;
+        m[15] = 1.0;
+        Mat4 { m }
+    }
+
     pub fn column(&self, col: usize) -> Vec4 {
         return Vec4::new(
             self.m[col * 4],
@@ -319,8 +319,82 @@ impl Mat4 {
         );
     }
 
+    pub fn minor3x3(
+        &self,
+        c0: usize,
+        c1: usize,
+        c2: usize,
+        r0: usize,
+        r1: usize,
+        r2: usize,
+    ) -> f32 {
+        self.m[c0 * 4 + r0]
+            * (self.m[c1 * 4 + r1] * self.m[c2 * 4 + r2]
+                - self.m[c1 * 4 + r2] * self.m[c2 * 4 + r1])
+            - self.m[c1 * 4 + r0]
+                * (self.m[c0 * 4 + r1] * self.m[c2 * 4 + r2]
+                    - self.m[c0 * 4 + r2] * self.m[c2 * 4 + r1])
+            + self.m[c2 * 4 + r0]
+                * (self.m[c0 * 4 + r1] * self.m[c1 * 4 + r2]
+                    - self.m[c0 * 4 + r2] * self.m[c1 * 4 + r1])
+    }
+
     pub fn new(m: [f32; 16]) -> Self {
         Mat4 { m }
+    }
+
+    pub fn transpose(&self) -> Self {
+        let mut c = Mat4::new(self.m);
+        c.m.swap(1, 4);
+        c.m.swap(2, 8);
+        c.m.swap(3, 12);
+        c.m.swap(6, 9);
+        c.m.swap(7, 13);
+        c.m.swap(11, 14);
+        c
+    }
+
+    pub fn inverse(&self) -> Self {
+        let det = self.determinant();
+
+        if (det == 0.0) {
+            return Mat4::identity();
+        }
+
+        let adj = self.adjugate();
+        return adj * (1.0 / det);
+    }
+
+    pub fn determinant(&self) -> f32 {
+        self.m[0] * self.minor3x3(1, 2, 3, 1, 2, 3) - self.m[4] * self.minor3x3(0, 2, 3, 1, 2, 3)
+            + self.m[8] * self.minor3x3(0, 1, 3, 1, 2, 3)
+            - self.m[12] * self.minor3x3(0, 1, 2, 1, 2, 3)
+    }
+
+    pub fn adjugate(&self) -> Mat4 {
+        let mut res = Mat4::identity();
+
+        res.m[0] = self.minor3x3(1, 2, 3, 1, 2, 3);
+        res.m[1] = -self.minor3x3(1, 2, 3, 0, 2, 3);
+        res.m[2] = self.minor3x3(1, 2, 3, 0, 1, 3);
+        res.m[3] = -self.minor3x3(1, 2, 3, 0, 1, 2);
+
+        res.m[4] = -self.minor3x3(0, 2, 3, 1, 2, 3);
+        res.m[5] = self.minor3x3(0, 2, 3, 0, 2, 3);
+        res.m[6] = -self.minor3x3(0, 2, 3, 0, 1, 3);
+        res.m[7] = self.minor3x3(0, 2, 3, 0, 1, 2);
+
+        res.m[8] = self.minor3x3(0, 1, 3, 1, 2, 3);
+        res.m[9] = -self.minor3x3(0, 1, 3, 0, 2, 3);
+        res.m[10] = self.minor3x3(0, 1, 3, 0, 1, 3);
+        res.m[11] = -self.minor3x3(0, 1, 3, 0, 1, 2);
+
+        res.m[12] = -self.minor3x3(0, 1, 2, 1, 2, 3);
+        res.m[13] = self.minor3x3(0, 1, 2, 0, 2, 3);
+        res.m[14] = -self.minor3x3(0, 1, 2, 0, 1, 3);
+        res.m[15] = self.minor3x3(0, 1, 2, 0, 1, 2);
+
+        res.transpose()
     }
 }
 
@@ -334,6 +408,18 @@ impl Mul<Vec4> for Mat4 {
             + self.column(3) * rhs.w;
 
         // self.column(0) + self.column(1) * rhs.y + self.column(2) * rhs.z + self.column(3) * rhs.w;
+    }
+}
+
+impl Mul<f32> for Mat4 {
+    type Output = Mat4;
+
+    fn mul(self, rhs: f32) -> Self::Output {
+        let mut m = self.m.clone();
+        for i in 0..m.len() {
+            m[i] *= rhs;
+        }
+        return Mat4::new(m);
     }
 }
 

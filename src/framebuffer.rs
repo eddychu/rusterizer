@@ -1,5 +1,6 @@
 use crate::math::Vec3;
 
+#[derive(Debug)]
 pub struct FrameBuffer {
     pub pixels: Vec<u32>,
     pub depths: Vec<f32>,

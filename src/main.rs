@@ -7,12 +7,10 @@ mod math;
 mod mesh;
 mod renderstate;
 mod texture;
-use std::f32::consts::PI;
-
 use arcball::Arcball;
-use camera::{Camera, MoveDirection};
+use camera::Camera;
 use framebuffer::FrameBuffer;
-use math::{Mat4, Quat, Vec2, Vec3, Vec4};
+use math::Vec3;
 
 use mesh::{Cube, Mesh};
 use minifb::{Key, Window, WindowOptions};
@@ -21,10 +19,8 @@ use texture::Texture;
 const WIDTH: usize = 800;
 const HEIGHT: usize = 600;
 
-// a simple cube for test
-
 fn main() {
-    let mut buffer = FrameBuffer::new(WIDTH, HEIGHT);
+    let buffer = FrameBuffer::new(WIDTH, HEIGHT);
     let mut arcball = Arcball::new(WIDTH as u32, HEIGHT as u32);
 
     let aspect = (WIDTH as f32) / (HEIGHT as f32);
@@ -63,30 +59,6 @@ fn main() {
     let mut mouse_pos_x = 0.0;
     let mut mouse_pos_y = 0.0;
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        // We unwrap here as we want this code to exit if it fails. Real applications may want to handle this in a different way
-        // if window.is_key_pressed(Key::W, minifb::KeyRepeat::Yes) {
-        //     state.camera.move_position(MoveDirection::Forward);
-        // }
-        // if window.is_key_pressed(Key::S, minifb::KeyRepeat::Yes) {
-        //     state.camera.move_position(MoveDirection::Backward);
-        // }
-
-        // if window.is_key_pressed(Key::L, minifb::KeyRepeat::Yes) {
-        //     state.camera.move_position(MoveDirection::Left);
-        // }
-
-        // if window.is_key_pressed(Key::R, minifb::KeyRepeat::Yes) {
-        //     state.camera.move_position(MoveDirection::Right);
-        // }
-
-        // if window.is_key_pressed(Key::Up, minifb::KeyRepeat::Yes) {
-        //     state.camera.move_position(MoveDirection::Up);
-        // }
-
-        // if window.is_key_pressed(Key::Down, minifb::KeyRepeat::Yes) {
-        //     state.camera.move_position(MoveDirection::Down);
-        // }
-
         if window.get_mouse_down(minifb::MouseButton::Left) {
             if !started {
                 (mouse_pos_x, mouse_pos_y) =
@@ -115,10 +87,8 @@ fn main() {
         state.target.clear();
 
         cube.draw(&mut state);
-        // return;
         window
             .update_with_buffer(&state.target.pixels, WIDTH, HEIGHT)
             .unwrap();
-        // angles += 0.02;
     }
 }

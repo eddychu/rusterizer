@@ -3,8 +3,6 @@ use std::{
     ops::{Add, Mul, Sub},
 };
 
-use nalgebra::Scalar;
-
 #[derive(Debug, Clone, Copy)]
 pub struct Vec2 {
     pub x: f32,

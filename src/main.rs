@@ -6,6 +6,7 @@ mod loader;
 mod math;
 mod mesh;
 mod renderstate;
+mod shader;
 mod texture;
 use arcball::Arcball;
 use camera::Camera;
@@ -17,7 +18,7 @@ use minifb::{Key, Window, WindowOptions};
 use renderstate::RenderState;
 use texture::Texture;
 const WIDTH: usize = 800;
-const HEIGHT: usize = 600;
+const HEIGHT: usize = 800;
 
 fn main() {
     let buffer = FrameBuffer::new(WIDTH, HEIGHT);
@@ -55,9 +56,12 @@ fn main() {
         panic!("{}", e);
     });
 
+    window.limit_update_rate(Some(std::time::Duration::from_millis(0)));
+
     let mut started = false;
     let mut mouse_pos_x = 0.0;
     let mut mouse_pos_y = 0.0;
+    let mut now = std::time::Instant::now();
     while window.is_open() && !window.is_key_down(Key::Escape) {
         if window.get_mouse_down(minifb::MouseButton::Left) {
             if !started {
@@ -78,7 +82,6 @@ fn main() {
                     mouse_pos_y = new_pos_y;
                 }
             }
-
             started = true;
         } else {
             started = false;
@@ -87,6 +90,10 @@ fn main() {
         state.target.clear();
 
         cube.draw(&mut state);
+
+        let elapsed_time = now.elapsed();
+        println!("rendering took {} milliseconds.", elapsed_time.as_millis());
+        now = std::time::Instant::now();
         window
             .update_with_buffer(&state.target.pixels, WIDTH, HEIGHT)
             .unwrap();

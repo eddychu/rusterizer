@@ -3,6 +3,8 @@ use crate::{
     renderstate::RenderState,
 };
 
+use rayon::prelude::*;
+
 fn orient2d(a: Vec2, b: Vec2, c: Vec2) -> f32 {
     return (c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x);
 }
@@ -146,6 +148,78 @@ impl Cube {
             vertices,
             indices: i,
         }
+    }
+
+    fn draw_experiment(&self, state: &mut RenderState) {
+        self.indices
+            .par_chunks(3)
+            .map(|indices| {
+                let i0 = indices[0];
+                let i1 = indices[1];
+                let i2 = indices[2];
+                // println!("{} {} {}", i, i + 1, i + 2);
+                let v0 = self.vertex(i0).position;
+                let v1 = self.vertex(i1).position;
+                let v2 = self.vertex(i2).position;
+
+                let t0 = self.vertex(i0).tex_coord.unwrap();
+                let t1 = self.vertex(i1).tex_coord.unwrap();
+                let t2 = self.vertex(i2).tex_coord.unwrap();
+
+                let mut clip_v0 = state.mvp * Vec4::from_vec3(&v0, 1.0);
+                let mut clip_v1 = state.mvp * Vec4::from_vec3(&v1, 1.0);
+                let mut clip_v2 = state.mvp * Vec4::from_vec3(&v2, 1.0);
+
+                // perspective devide
+                clip_v0 = Vec4::new(
+                    clip_v0.x / clip_v0.w,
+                    clip_v0.y / clip_v0.w,
+                    clip_v0.z / clip_v0.w,
+                    clip_v0.w,
+                );
+                clip_v1 = Vec4::new(
+                    clip_v1.x / clip_v1.w,
+                    clip_v1.y / clip_v1.w,
+                    clip_v1.z / clip_v1.w,
+                    clip_v1.w,
+                );
+                clip_v2 = Vec4::new(
+                    clip_v2.x / clip_v2.w,
+                    clip_v2.y / clip_v2.w,
+                    clip_v2.z / clip_v2.w,
+                    clip_v2.w,
+                );
+
+                // println!("{:?} {:?} {:?}", clip_v0, clip_v1, clip_v2);
+
+                let width = state.target.width as f32;
+                let height = state.target.height as f32;
+                // view_port_transform
+                clip_v0.x = (clip_v0.x + 1.0) * 0.5 * width;
+                clip_v0.y = (1.0 - clip_v0.y) * 0.5 * height;
+                clip_v1.x = (clip_v1.x + 1.0) * 0.5 * width;
+                clip_v1.y = (1.0 - clip_v1.y) * 0.5 * height;
+                clip_v2.x = (clip_v2.x + 1.0) * 0.5 * width;
+                clip_v2.y = (1.0 - clip_v2.y) * 0.5 * height;
+
+                // let c0: Vec3 = Vec3::new(1.0, 0.0, 0.0);
+                // let c1: Vec3 = Vec3::new(0.0, 1.0, 0.0);
+                // let c2: Vec3 = Vec3::new(0.0, 0.0, 1.0);
+                let min_x = clip_v0.x.min(clip_v1.x).min(clip_v2.x).max(0.0) as usize;
+                let min_y = clip_v0.y.min(clip_v1.y).min(clip_v2.y).max(0.0) as usize;
+                let max_x = clip_v0.x.max(clip_v1.x).max(clip_v2.x).min(width - 1.0) as usize;
+                let max_y = clip_v0.y.max(clip_v1.y).max(clip_v2.y).min(height - 1.0) as usize;
+
+                let a = Vec2::new(clip_v0.x + 0.5, clip_v0.y + 0.5);
+                let b = Vec2::new(clip_v1.x + 0.5, clip_v1.y + 0.5);
+                let c = Vec2::new(clip_v2.x + 0.5, clip_v2.y + 0.5);
+
+                [a, b, c]
+            })
+            .filter(|screen_coords| {
+                orient2d(screen_coords[0], screen_coords[1], screen_coords[2]) > 0.0
+            })
+            .map(|screen_coords| {});
     }
 }
 
